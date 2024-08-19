@@ -1,0 +1,39 @@
+#include<stdio.h>
+#include<unistd.h>
+#include<string.h>
+#include<stdlib.h>
+#include<sys/types.h>
+#include<sys/wait.h>
+ 
+void ChildRun()
+{
+	int cnt = 5;
+	while (cnt)
+	{
+		printf("I am child process,pid:%d,ppid:%d\n", getpid(), getppid());
+		sleep(1);
+		cnt--;
+	}
+}
+ 
+int main()
+{
+	printf("I am father,pid:%d,ppid:%d\n", getpid(), getppid());
+ 
+	pid_t id = fork();
+	if (id == 0)
+	{
+		ChildRun();
+		printf("child quit ...\n");
+		exit(0);
+	}
+	sleep(3);
+	pid_t rid = wait(NULL);
+	if (rid > 0)
+	{
+		printf("wait success,rid:%d\n", rid);
+	}
+	sleep(3);
+	printf("father quit\n");
+	return 0;
+}
