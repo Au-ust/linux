@@ -1,0 +1,298 @@
+#include<stdio.h>
+#include<unistd.h>
+#include<string.h>
+#include<stdlib.h>
+#include<sys/types.h>
+#include<errno.h>
+#include<sys/wait.h>
+#include<ctype.h>
+#include<fcntl.h>//open函数的库，是POSIX的系统调用函数
+
+#define SIZE 512
+#define ZERO '\0'//剔除\n
+#define SEP " "
+#define NUM 32
+
+char* filename;
+int lastcode=0;
+char* argv[SIZE];//被打散的命令存这里
+char userCommand[SIZE];//输入的命令存这里       
+//打印命令提示行的函数，命令提示行包括用户名+主机名+当前工作目录
+//此为获取用户名
+int redir=0;
+#define SkipSpace(pos) do{while(isspace(*pos)) pos++; }while(0)//跳过空格的函数
+
+ int checkChild();
+ void Redirection();
+ void checkRedir();
+ int length(char* arr[]);
+const char* getUser(){
+  char* user=getenv("USER");
+  if(user){
+    return user;
+  }else{
+    return "None";
+  }
+}
+//此为获取主机名
+const char* getHost(){
+  char* host=getenv("HOSTNAME");
+  if(host){
+    return host;
+  }else{
+    return "None";
+  }
+}
+//此为获取当前路径
+const char* getPwd(){
+  static char cwd[SIZE];
+  if(getcwd(cwd,sizeof(cwd))!=NULL){
+    return cwd;
+  }else{
+    return "None";
+  }
+}
+//这是整合上面三者的函数
+void MakeCommandLine(){
+  char line[SIZE];
+  const char* username=getUser();
+  const char* hostname=getHost();
+  const char* cwd=getPwd();
+  snprintf(line,sizeof(line), "[%s@%s %s]#", username, hostname, cwd);
+ //snprintf是给定大小的更安全的向内存空间中写入的printf（写到缓冲区）
+  printf("%s",line);
+  fflush(stdout);
+ //printf("[%s@%s %s]#",getUser(),getHost(),getPwd());
+}
+//获取用户命令
+int getCommand(char userCommand[],int n){
+  char* s=fgets(userCommand,n,stdin);//使用fgets()函数获取命令
+  if(s==NULL){                                  
+  return -1;
+  }
+  userCommand[strlen(userCommand)-1]=ZERO;
+  return strlen(userCommand);
+}                         
+//分散字符串
+void commandSplit(char* in,char* out[]){//in是输入的字符串，out[]是打散的字符数组
+  int argc=0;
+  out[argc++]=strtok(in,SEP);//此处的SEP是宏定义，SEP是空格的意思
+  while((out[argc++]=strtok(NULL,SEP))!=NULL);
+  out[argc]=NULL;
+#ifdef debug 
+    int i=0;
+    for(i=0;out[i];i++){
+      printf("%s\n",out[i]);
+    }
+#endif
+}
+//进程替换
+int execute(){
+  pid_t id=fork();//创建子进程
+  if(id==0){
+    int fd; 
+   printf("redir=%d\n",redir);
+   printf("filename=%s",filename);
+   if(redir==3){
+       fd=open(filename,O_RDONLY);
+       if(fd<0){
+             perror("open output file");
+             exit(EXIT_FAILURE);
+         }
+       dup2(fd,STDIN_FILENO);
+       close(fd);
+     }else if(redir==2){
+       fd=open(filename,O_WRONLY | O_CREAT | O_TRUNC,0666);
+       if (fd < 0) {
+             perror("open output file");
+             exit(EXIT_FAILURE);
+         }
+       dup2(fd,STDOUT_FILENO);
+       close(fd);
+     }else if(redir==1){
+       fd=open(filename,O_WRONLY | O_CREAT | O_APPEND,0666);
+        if (fd < 0) {
+             perror("open output file");
+             exit(EXIT_FAILURE);
+         }
+       dup2(fd,STDOUT_FILENO);
+       close(fd);
+     }else{
+       printf("son process dafult");
+     }
+     // printf("son process begining...");
+      execvp(argv[0],argv);//替换进程
+      exit(EXIT_FAILURE);//替换失败就会退出
+  }else{
+    int status=0;
+    pid_t rid=waitpid(-1,&status,0);
+    if(rid==id){//父进程在这里只需要等待子进程就好了
+      printf("wait success\n");
+      lastcode=WEXITSTATUS(status);
+      printf("%d",lastcode);
+      return 0;
+    }   
+    }
+return 0;  
+  }
+
+
+//切换home路径
+const char*Home(){
+  const char* home=getenv("Home");
+  if(home==NULL){
+    return "/";
+  }
+  return home;
+}
+
+//改变路径的函数
+void cd(){
+  const char* path=argv[1];
+  if(path==NULL){
+    path=Home();//如果为空回到家目录
+  }
+  if(chdir(path)==0){
+    setenv("PWD",getcwd(NULL,0),1);//setenv函数会修改进程的环境变量；修改后只有当前进程及其子进程能够看到这些变化
+  }else{
+    perror("cd faild");
+  }
+}
+//echo的内建命令
+int echo(){
+  if(strcmp(argv[0],"echo")==0){
+    if(argv[1]==NULL){
+      printf("\n");
+      return 1;
+    }
+    if(*(argv[1])=='$'&&strlen(argv[1])>1){
+      char *val=argv[1]+1;
+      if(strcmp(val,"?")==0){
+      printf("%d\n",lastcode);
+      lastcode=0;
+      }else{
+        char* enval=getenv(val);
+        if(enval){
+          printf("%s\n",enval);
+        }else{
+          printf("\n");
+         } 
+        }
+      return 1;
+       }
+    if(redir!=0)return 0;
+  }
+  return 1;
+}
+void checkRedir(){
+  //ls -a -l > log.txt
+  //ls -a -l >> log.txt
+  // char* filename=NULL;
+  int len=strlen(userCommand);
+  char* start=userCommand;
+  char* end=userCommand+len-1;
+  while(end>start){
+    if((*end)=='>'){
+      if(*(end-1)=='>'){
+        *(end-1)='\0';
+        filename=end+1;
+        SkipSpace(filename);//如果有空格，就跳过
+        redir=1;
+        break;
+      }else{
+        *end='\0';
+        filename=end+1;
+        SkipSpace(filename);
+        redir=2;
+        break;
+      }
+    }else if(*end=='<'){
+      *end='\0';
+      filename=end+1;
+      SkipSpace(filename);
+      redir=3;
+      break;
+    }else{
+      end--;
+    }
+  }
+}
+void Redirection(int id){ 
+  int fd; 
+  printf("redir=%d\n",redir);
+  printf("filename=%s",filename+1);
+  if(id==0){
+  if(redir==3){
+      fd=open(filename,O_RDONLY);
+       if (fd < 0) {
+            perror("open output file");
+            exit(EXIT_FAILURE);
+        }
+      dup2(fd,STDIN_FILENO);
+      close(fd);
+    }else if(redir==2){
+      fd=open(filename,O_WRONLY | O_CREAT | O_TRUNC,0666);
+      if (fd < 0) {
+            perror("open output file");
+            exit(EXIT_FAILURE);
+        }
+      dup2(fd,STDOUT_FILENO);
+      close(fd);
+    }else if(redir==1){
+      fd=open(filename,O_WRONLY | O_CREAT | O_APPEND,0666);
+       if (fd < 0) {
+            perror("open output file");
+            exit(EXIT_FAILURE);
+        }
+      dup2(fd,STDOUT_FILENO);
+      close(fd);
+    }
+  }
+    else{
+     printf("son process begining...");
+     execvp(argv[0],argv);//替换进程
+     exit(0);//替换失败就会退出
+
+    }
+  }
+
+
+
+int checkChild(){
+  int yes=0;
+  const char* enter_cmd=argv[0];
+  if(strcmp(enter_cmd,"cd")==0){
+    yes=1;
+    cd();
+  }else{
+    if(strcmp(enter_cmd,"echo")==0){
+    if(redir==0){
+     return echo();
+    }
+  }
+ } 
+    return 0;
+}
+
+int length(char* arr[]){
+  int i=0;
+  while(arr[i]!=NULL){
+    i++;
+  }
+  return i;
+    }
+
+int main(){
+  while(1){
+  MakeCommandLine();
+  getCommand(userCommand,sizeof(userCommand));
+  redir=0;
+  filename=NULL;
+  checkRedir();
+  commandSplit(userCommand,argv);
+  if(checkChild())continue;
+  execute();
+  } 
+  return 0;
+}
+
