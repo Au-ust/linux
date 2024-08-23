@@ -1,0 +1,11 @@
+  1 #include<stdio.h>
+  2 #include<string.h>
+  3 int main()
+  4 {
+  5   const char* msg = "hello fwrite\n";
+  6   fwrite(msg, strlen(msg), 1, stdout);                                                            
+  7   printf("hello printf\n");
+  8   fprintf(stdout, "hello fprintf\n");
+  9   return 0;
+ 10 }
+~
