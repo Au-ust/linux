@@ -1,0 +1,20 @@
+#include<stdio.h>
+#include<string.h>
+#include<stdlib.h>
+#include<unistd.h>
+#include<sys/types.h>
+#include<sys/stat.h>
+#include<fcntl.h>
+ 
+const char* filename="log.txt";
+ 
+int main()
+{
+  int fd = open(filename,O_CREAT|O_WRONLY|O_TRUNC,0666);
+  
+  dup2(fd,1);
+ 
+  printf("hello world\n");
+  fprintf(stdout,"hello world\n");
+  return 0;
+}
