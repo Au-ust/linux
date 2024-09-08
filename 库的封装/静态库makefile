@@ -1,0 +1,5 @@
+mytest.out:mytest.c
+         gcc -o $@ $^ -I /home/name/test -L /home/name/test -l mymath
+.PHONY:clean
+clean:
+        rm -f mytest
