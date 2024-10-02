@@ -25,7 +25,7 @@ int main(){
         return 1;
     }
     //创建信号量
-    int semid= semget(key,3,IPC_EXCL|IPC_CREAT);
+    int semid= semget(key,3,IPC_EXCL|0666);
     if(semid<0){
         perror("semget");
         return -1;
