@@ -16,6 +16,13 @@ union semun{
     int val;
     struct semid_ds *buf;
 };//联合体，联合体内的成员共享同一块空间
+struct sembuf{
+    unsigned short sem_num;//信号量的索引
+    short sem_op;//信号量操作，<0则表示P，>0则表示V,0表示等待
+    short sem_flg;//操作标志,IPC_NOWAIT(非阻塞)和SEM_UNDO(系统恢复时撤销操作)
+};
+
+
 
 int main(){
     //创建key
@@ -25,7 +32,7 @@ int main(){
         return 1;
     }
     //创建信号量
-    int semid= semget(key,3,IPC_EXCL|0666);
+    int semid= semget(key,3,IPC_EXCL|IPC_CREAT|0666);
     if(semid<0){
         perror("semget");
         return -1;
@@ -38,21 +45,40 @@ int main(){
         perror("semctl");
         return -1;
     }
-    //获取信号量的值
-    int val=semctl(semid,0,GETVAL);
-    if(val<0){
-        perror("semctl val");
+    //等待信号量的值为0
+    struct sembuf sop;
+    sop.sem_num=0;
+    sop.sem_op=0;
+    sop.sem_flg=0;
+    result=semop(semid,&sop,1);
+    if(result<0){
+        perror("semop");
         return -1;
     }
-    printf("val==%d",val);
+    printf("Semaphore operation complete.\n");
+    //对信号量进行P操作
+    sop.sem_op=-1;
+    result=semop(semid,&sop,1);
+      if(result<0){
+        perror("semop");
+        return -1;
+    }
+    //进行V操作
+    sop.sem_op=1;
+    result=sempo(semid,&sop,1);
+      if(result<0){
+        perror("semop");
+        return -1;
+    }
     //删除信号量
      result = semctl(semid, 0, IPC_RMID);
     if (result == -1) {
         perror("semctl del");
         return -1;
     }
-
-    printf("key==%d,semid==%d\n",key,semid);
+ 
+    
+    printf("key==%d\nsemid==%d\n",key,semid);
    
     
     return 0;
