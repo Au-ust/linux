@@ -8,6 +8,7 @@
 #include <sys/sem.h>
 #define MY_FIFO "./fifo"
 #include<sys/shm.h>
+#include <errno.h>
 #define PATH_NAME "./"
 #define PROJ_ID 0X6667
 
@@ -28,7 +29,6 @@ void mysemop(int num,int op,int semid){
     buf.sem_flg=0;
     semop(semid,&buf,1);
 }
-int errno;
 
 int main(){
     //创建key
@@ -57,7 +57,7 @@ int main(){
         return -1;
     }
     sem.val=10;
-    result=semctl(semid,0,SETVAL,sem);
+    result=semctl(semid,1,SETVAL,sem);
     if(result<0){
         perror("semctl");
         return -1;
