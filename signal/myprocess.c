@@ -2,7 +2,7 @@
 #include<signal.h>
 #include<sys/types.h>
 #include<unistd.h>
-int handler(int sig){
+void handler(int sig){
     printf("get a sig form myskill,sig==%d",sig);
 }
 
@@ -11,7 +11,8 @@ int main(){
     //此处的类型为一个函数指针，在执行该语句的时候执行一个handler函数，这个函数是要自己声明的
     //格式为int handler(int sig)
     while(1){
-        printf("a new process,pid==%d",getpid());
+        printf("a process,pid==%d\n",getpid());
+        fflush(stdout);
         sleep(1);
     }
     return 0;
