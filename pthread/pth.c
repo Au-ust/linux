@@ -13,6 +13,7 @@ void* gopthread(void *arg){
 
     }
 }
+
 int main(){
     srand(time(NULL));
     pthread_t tid1;
