@@ -6,7 +6,7 @@
 typedef struct ThreadData{
     char name[20];
     int num;
-}ThreadData;
+}ThreadData;//定义结构体
 
 void* gopthread(void* arg){
     int cnt=5;
@@ -17,10 +17,10 @@ void* gopthread(void* arg){
 }
 int main(){
     pthread_t tid;
-    ThreadData *td=(ThreadData*)malloc(sizeof(ThreadData));
+    ThreadData *td=(ThreadData*)malloc(sizeof(ThreadData));//防止两个线程同时访问同一片内存，破坏坏主线程的完整性及独立性
     strcpy(td->name,"thread-1");
     td->num=1;
-    int n=pthread_create(&tid,NULL,gopthread,(void*)"pthread 1");
+    int n=pthread_create(&tid,NULL,gopthread,(void*)&td);//传参
     if(n!=0){
         perror("creat failed\n");
         return -1;
