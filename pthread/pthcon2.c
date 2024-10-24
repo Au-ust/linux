@@ -5,10 +5,10 @@
 #include <string.h>
 void*  gopthread(void* args){
     char* name=(char*)args;
-     
+   
         printf("%s pthread is running\n",name);
         sleep(1);
-    
+        pthread_exit(args);
     return args;
 }
 
