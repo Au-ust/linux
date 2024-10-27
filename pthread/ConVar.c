@@ -3,15 +3,32 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h> 
+#define BUFFER_SIZE 5 // 缓冲区大小
+
+int buffer[BUFFER_SIZE]; // 缓冲区
+int count = 0;           // 当前缓冲区中数据数量
+int in = 0;              // 生产者放入数据的位置
+int out = 0;             // 消费者取数据的位置
+
 pthread_mutex_t mutex=PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t cond_var=PTHREAD_COND_INITIALIZER;//pthread_cond_t 是 POSIX 线程库（Pthreads）中用于表示条件变量的数据类型，定义一个全局的变量
-int shared_data=0;//设定的共享数据捏
+//pthread_cond_t cond_var=PTHREAD_COND_INITIALIZER;//pthread_cond_t 是 POSIX 线程库（Pthreads）中用于表示条件变量的数据类型，定义一个全局的变量
+pthread_cond_t cond_empty=PTHREAD_COND_INITIALIZER;
+pthread_cond_t cond_full=PTHREAD_COND_INITIALIZER;//因为我们要用队列来存储，所以需要用条件变量确保队列的空/满
+
+//int shared_data=0;删除设定的共享数据捏
 void *producer(void* args){
     char* producer_name=(char*)args;
     while(1){
         pthread_mutex_lock(&mutex);//锁上
-        shared_data++;//生产数据
-        printf("i'm a %s Producer data:%d\n",producer_name,shared_data);
+        int item=rand()%100;//随机生产数据
+        while(count==BUFFER_SIZE){//缓冲区要是满了
+            pthread_cond_wait(&cond_full,&mutex);//就等待
+        }
+        buffer[in]=item;
+        in=(in+1)%BUFFER_SIZE;//确认新位置
+        count++;
+        printf("i'm a %s Producer data:%d\n",producer_name,item);
+        pthread_cond_signal(&cond_empty);//通知消费者数据可用
         printf("-----------------------------------\n");
         pthread_mutex_unlock(&mutex);// 解锁互斥锁
         sleep(4); // 模拟生产耗时
@@ -26,16 +43,17 @@ void *consumer(void *args) {
         pthread_mutex_lock(&mutex);
 
         // 等待生产者生产数据
-        while (shared_data == 0) {
+        while (count == 0) {
             // 等待条件变量，解锁互斥锁，进入等待状态
-            pthread_cond_wait(&cond_var, &mutex);
+            pthread_cond_wait(&cond_empty, &mutex);
         }
-
-        // 消费数据（这里只是简单地递减shared_data）
-        shared_data--;
-        printf("I'm %s Consumer consumed data: %d\n", consumer_name, shared_data);
+        // 消费数据
+        int item=buffer[out];
+        out=(out+1)%BUFFER_SIZE;
+        count--;
+        printf("I'm %s Consumer consumed data: %d\n", consumer_name, item);
         printf("-----------------------------------\n");
-
+        pthread_cond_signal(&cond_full); // 通知生产者有空位
         // 解锁互斥锁
         pthread_mutex_unlock(&mutex);
 
@@ -44,8 +62,6 @@ void *consumer(void *args) {
     }
     return (void*)consumer_name; 
 }
-
-
 
 int main(){
     int producer_thread_num=5;//生产者人数
@@ -87,7 +103,8 @@ int main(){
         free(consumer_names[i]);
     }//线程退出
     // 销毁条件变量
-    pthread_cond_destroy(&cond_var);
+    pthread_cond_destroy(&cond_empty);
+    pthread_cond_destroy(&cond_full);
     // 销毁锁
     pthread_mutex_destroy(&mutex);
     return 0;
