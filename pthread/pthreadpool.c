@@ -21,13 +21,37 @@ typedef struct thread_pool{
     int shutdowm;//是否销毁线程池
 }pthread_pool;
 //创建接口
+//给线程池添加任务
+void addWork(pthread_pool* pool, void* arg, void(*run_task)(void*arg)){
+    if(pool->shutdowm==1){//如果线程池已经关闭 
+        return;
+    }
+    //初始化
+    task* task_pool=(task*)malloc(sizeof(task));
+    task_pool->arg=arg;
+    task_pool->run_task=run_task;
+    task_pool->next=NULL;
+    //初始化完毕，开锁！
+    pthread_mutex_lock(&pool->mutex_pool);
+    if(pool->first==NULL){//如果是第一个线程
+        pool->first=task_pool;
+        pool->end=task_pool;
+    }else{
+        pool->end->next=task_pool;//追加新节点
+        pool->end=task_pool;//更新链表
+    }
+     pool->tasksize++;
+    pthread_cond_signal(&pool->notempty);//唤醒阻塞的线程
+    pthread_mutex_unlock(&pool->mutex_pool);//解锁
+
+}
 
 //初始化线程
 pthread_pool* pthread_init(int number){
     pthread_pool *pool=(pthread_pool*)malloc(sizeof(pthread_pool));
     if(pool==NULL){
         perror("malloc error");
-        return 1;
+        return NULL;
     }
     //初始化线程池信息
     pool->threadNum=number;
@@ -66,34 +90,12 @@ int pthread_destory(pthread_pool* pool){
     pool=NULL;
     return 0;
 }
-//给线程池添加任务
-void addWork(pthread_pool* pool, void* arg, void(*run_task)(void*arg)){
-    if(pool->shutdowm==1){//如果线程池已经关闭 
-        return;
-    }
-    //初始化
-    task* task_pool=(task*)malloc(sizeof(task));
-    task_pool->arg=arg;
-    task_pool->run_task=run_task;
-    task_pool->next=NULL;
-    //初始化完毕，开锁！
-    pthread_mutex_lock(&pool->mutex_pool);
-    if(pool->first==NULL){//如果是第一个线程
-        pool->first=task_pool;
-        pool->end=task_pool;
-    }else{
-        pool->end->next=task_pool;//追加新节点
-        pool->end=task_pool;//更新链表
-    }
-     pool->tasksize++;
-    pthread_cond_signal(&pool->notempty);//唤醒阻塞的线程
-    pthread_mutex_unlock(&pool->mutex_pool);//解锁
 
-}
 //执行任务
 int main(){
     pthread_pool* pool=pthread_init(5);//创建5个线程
-    addWork(pool,pool,run_task);
+    task t;
+    addWork(pool,t.arg,run_task);
     usleep(20);
     pthread_destory(pool);
     return 0;
