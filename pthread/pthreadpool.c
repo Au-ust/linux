@@ -65,7 +65,7 @@ void addWork(pthread_pool* pool, void* arg, void(*run_task)(void*arg)){
     task_pool->arg=arg;
     task_pool->run_task=run_task;
     task_pool->next=NULL;
-    //初始化完毕，开锁！
+    //初始化完毕，锁！
     pthread_mutex_lock(&pool->mutex_pool);
     if(pool->first==NULL){//如果是第一个线程
         pool->first=task_pool;
@@ -75,6 +75,7 @@ void addWork(pthread_pool* pool, void* arg, void(*run_task)(void*arg)){
         pool->end=task_pool;//更新链表
     }
      pool->tasksize++;
+     printf("添加任务中。。。\n");
     pthread_cond_signal(&pool->notempty);//唤醒阻塞的线程
     pthread_mutex_unlock(&pool->mutex_pool);//解锁
 
@@ -100,6 +101,7 @@ pthread_pool* pthread_init(int number){
     //生产线程
     for(int i=0;i<number;i++){
         pthread_t tid;
+        printf("线程%d初始化中。。。\n",i+1);
         pthread_create(&tid,NULL,thread_work,pool);//传入你的线程池结构体
     }
     return pool;
@@ -119,7 +121,7 @@ int pthread_destory(pthread_pool* pool){
     for(int i=0;i<pool->threadNum;i++){
         pthread_cond_broadcast(&pool->notempty);//唤醒阻塞线程
         pthread_join(pool->threads[i], NULL);//分离线程
-        printf("线程-%d正在销毁。。。\n",i);
+        printf("线程-%d正在销毁。。。\n",i+1);
     }
     pthread_mutex_destroy(&pool->mutex_pool);
     pthread_cond_destroy(&pool->notempty);
@@ -128,8 +130,6 @@ int pthread_destory(pthread_pool* pool){
     pool=NULL;
     return 0;
 }
-
-
 
 int main(){
     pthread_pool* pool=pthread_init(5);//创建5个线程
